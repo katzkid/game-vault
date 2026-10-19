@@ -58,6 +58,62 @@
     }
     .stat-pill span { color: var(--primary); font-weight: 700; }
     main { flex: 1; width: 100vw; padding: 1.5rem; }
+    
+    /* Filter Bar Styling */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      align-items: center;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      padding: 1rem 1.25rem;
+      border-radius: 12px;
+    }
+    .filter-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .filter-item label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+    .filter-select {
+      background: #1f2937;
+      color: #f9fafb;
+      border: 1px solid var(--border-accent);
+      border-radius: 8px;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.825rem;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .filter-select:focus {
+      border-color: var(--primary);
+    }
+    .btn-reset {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border-accent);
+      border-radius: 8px;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      margin-top: auto;
+      transition: all 0.2s;
+    }
+    .btn-reset:hover {
+      background: #1f2937;
+      color: #fff;
+      border-color: #6b7280;
+    }
+
     .table-card {
       background: var(--bg-card);
       border: 1px solid var(--border-subtle);
@@ -114,6 +170,27 @@
   </header>
 
   <main>
+    <!-- Dynamic Filters -->
+    <div class="filter-bar" id="filter-bar" style="display:none;">
+      <div class="filter-item">
+        <label for="filter-platform">Platform</label>
+        <select id="filter-platform" class="filter-select"><option value="">All Platforms</option></select>
+      </div>
+      <div class="filter-item">
+        <label for="filter-region">Region</label>
+        <select id="filter-region" class="filter-select"><option value="">All Regions</option></select>
+      </div>
+      <div class="filter-item">
+        <label for="filter-completeness">Completeness</label>
+        <select id="filter-completeness" class="filter-select"><option value="">All Types</option></select>
+      </div>
+      <div class="filter-item">
+        <label for="filter-status">Play Status</label>
+        <select id="filter-status" class="filter-select"><option value="">All Statuses</option></select>
+      </div>
+      <button class="btn-reset" onclick="resetFilters()">Reset Filters</button>
+    </div>
+
     <div class="table-card">
       <div id="loader">
         <p>Loading collection from <code>games.csv</code>...</p>
@@ -129,6 +206,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
   <script>
+    let dataTableInstance = null;
+    let columnIndexMap = {};
+
     function showError(title, message, fix) {
       document.getElementById('loader').innerHTML = `
         <div class="error-box">
@@ -141,64 +221,46 @@
     }
 
     async function loadCollection() {
-      // 1. Check if user is opening locally as file://
       if (window.location.protocol === 'file:') {
         showError(
           "Opened via Local File Protocol",
-          "Browsers block <code>fetch()</code> requests when opening HTML files directly from your desktop (<code>file:///...</code>).",
-          "Push this file to GitHub Pages or run a local server (e.g. VS Code Live Server)."
+          "Browsers block <code>fetch()</code> requests when opening HTML files directly from your desktop.",
+          "Push this file to GitHub Pages or run a local web server."
         );
         return;
       }
 
-      // 2. Fetch games.csv (with timestamp to prevent browser caching)
       let csvText = "";
       try {
         const response = await fetch('games.csv?t=' + Date.now());
         if (response.status === 404) {
           showError(
             "games.csv Not Found (404)",
-            "The browser requested <code>games.csv</code> at <code>" + window.location.href.split('?')[0] + "games.csv</code>, but GitHub returned 404.",
-            "Verify that your file in the repository is named exactly <code>games.csv</code> (lowercase) and is located in the root alongside <code>index.html</code>."
+            "Could not locate <code>games.csv</code> in repository root.",
+            "Make sure your file is committed as <code>games.csv</code> alongside <code>index.html</code>."
           );
           return;
         }
-        if (!response.ok) {
-          throw new Error("HTTP " + response.status + " " + response.statusText);
-        }
+        if (!response.ok) throw new Error("HTTP " + response.status + " " + response.statusText);
         csvText = await response.text();
       } catch (err) {
-        showError(
-          "Network / Fetch Error",
-          err.message,
-          "Check your browser's Developer Tools Console (F12) for detailed network error details."
-        );
+        showError("Fetch Error", err.message, "Inspect browser console (F12).");
         return;
       }
 
-      // 3. Parse CSV with PapaParse
       Papa.parse(csvText, {
         header: true,
         skipEmptyLines: true,
-        dynamicTyping: false,
         complete: function(results) {
           if (!results.data || results.data.length === 0) {
-            showError(
-              "Empty CSV Data",
-              "<code>games.csv</code> was found, but it contains no data rows.",
-              "Ensure your CSV file contains game rows below the header line."
-            );
+            showError("Empty CSV", "No data rows found in games.csv.", "Add game entries to CSV.");
             return;
           }
-
           try {
             initDataTable(results.data, results.meta.fields);
           } catch (initErr) {
-            showError("DataTable Render Error", initErr.message, "Inspect browser console (F12).");
+            showError("Render Error", initErr.message, "Inspect console (F12).");
           }
-        },
-        error: function(parseErr) {
-          showError("CSV Parse Error", parseErr.message, "Check CSV formatting for unclosed quotes.");
         }
       });
     }
@@ -206,7 +268,8 @@
     function initDataTable(data, rawHeaders) {
       const fields = rawHeaders.filter(h => h && h.trim() !== "");
       
-      const columns = fields.map(col => {
+      const columns = fields.map((col, idx) => {
+        columnIndexMap[col] = idx;
         let title = col.replace(/_/g, ' ');
         return {
           title: title,
@@ -226,33 +289,9 @@
         };
       });
 
-      let totalValue = 0;
-      data.forEach(item => {
-        const val = parseFloat(item.Current_Estimated_Value || item.Estimated_Value_CIB || item.Purchase_Price || 0);
-        if (!isNaN(val)) totalValue += val;
-      });
-
-      document.getElementById('stat-count').textContent = data.length;
-      document.getElementById('stat-val').textContent = "€" + totalValue.toFixed(2);
-
-      document.getElementById('loader').style.display = 'none';
-      document.getElementById('table-wrapper').style.display = 'block';
-
-      $('#collectionTable').DataTable({
-        data: data,
-        columns: columns,
-        pageLength: 25,
-        scrollX: true,
-        destroy: true,
-        order: [[1, 'asc']],
-        language: {
-          search: "",
-          searchPlaceholder: "Search titles, codes, genres..."
-        }
-      });
-    }
-
-    window.addEventListener('DOMContentLoaded', loadCollection);
-  </script>
-</body>
-</html>
+      function updateStats() {
+        if (!dataTableInstance) return;
+        const filteredData = dataTableInstance.rows({ filter: 'applied' }).data().toArray();
+        let totalVal = 0;
+        filteredData.forEach(item => {
+          const val = parseFloat(item.Current_Estimated_Value || item.Estimated_Value_CIB || item.Purchase_
