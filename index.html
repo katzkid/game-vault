@@ -4,14 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Video Game Vault</title>
-  <!-- DataTables & PapaParse -->
+  <!-- DataTables CSS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-
+  
   <style>
     :root {
       --bg-base: #0b0f19;
@@ -86,7 +83,23 @@
     .badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
     .badge-code { background: #1e293b; color: #38bdf8; border: 1px solid #334155; font-family: monospace; }
     .badge-val { color: #fbbf24; font-weight: 600; }
-    #loader { text-align: center; padding: 3rem; color: var(--text-muted); font-size: 1.1rem; }
+    #loader { text-align: center; padding: 3rem; color: var(--text-muted); font-size: 1rem; line-height: 1.6; }
+    .error-box {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+      padding: 1.25rem;
+      border-radius: 8px;
+      max-width: 600px;
+      margin: 0 auto;
+      text-align: left;
+    }
+    .error-box code {
+      background: #1f2937;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #f87171;
+    }
   </style>
 </head>
 <body>
@@ -102,67 +115,144 @@
 
   <main>
     <div class="table-card">
-      <div id="loader">Loading collection from games.csv...</div>
-      <table id="collectionTable" class="display nowrap" style="display:none; width:100%;">
-        <thead></thead>
-        <tbody></tbody>
-      </table>
+      <div id="loader">
+        <p>Loading collection from <code>games.csv</code>...</p>
+      </div>
+      <div id="table-wrapper" style="display:none;">
+        <table id="collectionTable" class="display nowrap" style="width:100%;"></table>
+      </div>
     </div>
   </main>
 
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
   <script>
-    // Relative fetch targeting games.csv in the same repository
-    const csvFilePath = "games.csv";
-
-    async function loadRepoData() {
-      try {
-        const response = await fetch(csvFilePath);
-        if (!response.ok) {
-          throw new Error("Could not find games.csv in repository root.");
-        }
-        const csvText = await response.text();
-
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          complete: function(results) {
-            renderTable(results.data, results.meta.fields);
-          }
-        });
-      } catch (err) {
-        document.getElementById('loader').innerHTML = `
-          <div style="color: #f87171;">
-            <p><strong>Failed to load collection</strong>: ${err.message}</p>
-            <p style="font-size:0.85rem; margin-top: 8px;">Ensure <code>games.csv</code> is committed in the same folder as <code>index.html</code>.</p>
-          </div>`;
-      }
+    function showError(title, message, fix) {
+      document.getElementById('loader').innerHTML = `
+        <div class="error-box">
+          <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:8px; color:#f87171;">⚠️ ${title}</h3>
+          <p style="margin-bottom:8px;">${message}</p>
+          <div style="font-size:0.875rem; color:#cbd5e1; border-top:1px solid rgba(239,68,68,0.2); padding-top:8px;">
+            <strong>How to fix:</strong> ${fix}
+          </div>
+        </div>`;
     }
 
-    function renderTable(data, columns) {
-      document.getElementById('loader').style.display = 'none';
-      const table = document.getElementById('collectionTable');
-      table.style.display = 'table';
+    async function loadCollection() {
+      // 1. Check if user is opening locally as file://
+      if (window.location.protocol === 'file:') {
+        showError(
+          "Opened via Local File Protocol",
+          "Browsers block <code>fetch()</code> requests when opening HTML files directly from your desktop (<code>file:///...</code>).",
+          "Push this file to GitHub Pages or run a local server (e.g. VS Code Live Server)."
+        );
+        return;
+      }
 
-      // Setup dynamic table headers
-      const thead = table.querySelector('thead');
-      thead.innerHTML = "";
-      const headerRow = document.createElement('tr');
-      columns.forEach(col => {
-        const th = document.createElement('th');
-        th.textContent = col.replace(/_/g, ' ');
-        headerRow.appendChild(th);
+      // 2. Fetch games.csv (with timestamp to prevent browser caching)
+      let csvText = "";
+      try {
+        const response = await fetch('games.csv?t=' + Date.now());
+        if (response.status === 404) {
+          showError(
+            "games.csv Not Found (404)",
+            "The browser requested <code>games.csv</code> at <code>" + window.location.href.split('?')[0] + "games.csv</code>, but GitHub returned 404.",
+            "Verify that your file in the repository is named exactly <code>games.csv</code> (lowercase) and is located in the root alongside <code>index.html</code>."
+          );
+          return;
+        }
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status + " " + response.statusText);
+        }
+        csvText = await response.text();
+      } catch (err) {
+        showError(
+          "Network / Fetch Error",
+          err.message,
+          "Check your browser's Developer Tools Console (F12) for detailed network error details."
+        );
+        return;
+      }
+
+      // 3. Parse CSV with PapaParse
+      Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: false,
+        complete: function(results) {
+          if (!results.data || results.data.length === 0) {
+            showError(
+              "Empty CSV Data",
+              "<code>games.csv</code> was found, but it contains no data rows.",
+              "Ensure your CSV file contains game rows below the header line."
+            );
+            return;
+          }
+
+          try {
+            initDataTable(results.data, results.meta.fields);
+          } catch (initErr) {
+            showError("DataTable Render Error", initErr.message, "Inspect browser console (F12).");
+          }
+        },
+        error: function(parseErr) {
+          showError("CSV Parse Error", parseErr.message, "Check CSV formatting for unclosed quotes.");
+        }
       });
-      thead.appendChild(headerRow);
+    }
 
-      // Map DataTables column fields
-      const dtColumns = columns.map(col => ({ data: col, defaultContent: "" }));
+    function initDataTable(data, rawHeaders) {
+      const fields = rawHeaders.filter(h => h && h.trim() !== "");
+      
+      const columns = fields.map(col => {
+        let title = col.replace(/_/g, ' ');
+        return {
+          title: title,
+          data: col,
+          defaultContent: "",
+          render: function(cellData, type, row) {
+            if (type !== 'display' || !cellData) return cellData;
+            if (col === 'ID' || col.includes('Catalog') || col.includes('Product')) {
+              return `<span class="badge badge-code">${cellData}</span>`;
+            }
+            if (col.includes('Price') || col.includes('Value')) {
+              const num = parseFloat(cellData);
+              return !isNaN(num) ? `<span class="badge-val">€${num.toFixed(2)}</span>` : cellData;
+            }
+            return cellData;
+          }
+        };
+      });
 
-      // Calculate totals
       let totalValue = 0;
       data.forEach(item => {
-        const val = parseFloat(item.Current_Estimated_Value || item.Estimated_Value_CIB || 0);
+        const val = parseFloat(item.Current_Estimated_Value || item.Estimated_Value_CIB || item.Purchase_Price || 0);
         if (!isNaN(val)) totalValue += val;
       });
 
       document.getElementById('stat-count').textContent = data.length;
-      document.
+      document.getElementById('stat-val').textContent = "€" + totalValue.toFixed(2);
+
+      document.getElementById('loader').style.display = 'none';
+      document.getElementById('table-wrapper').style.display = 'block';
+
+      $('#collectionTable').DataTable({
+        data: data,
+        columns: columns,
+        pageLength: 25,
+        scrollX: true,
+        destroy: true,
+        order: [[1, 'asc']],
+        language: {
+          search: "",
+          searchPlaceholder: "Search titles, codes, genres..."
+        }
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', loadCollection);
+  </script>
+</body>
+</html>
