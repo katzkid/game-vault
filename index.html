@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Game Vault (Live Gist Sync)</title>
+  <!-- DataTables & PapaParse for CSV parsing -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <style>
+    :root {
+      --bg-base: #0b0f19;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.95);
+      --border-subtle: #1f2937;
+      --border-accent: #374151;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 1rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .brand-title h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #a5b4fc, #6366f1, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .stats-group { display: flex; gap: 1rem; align-items: center; }
+    .stat-pill {
+      background: #1f2937;
+      border: 1px solid var(--border-accent);
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.825rem;
+    }
+    .stat-pill span { color: var(--primary); font-weight: 700; }
+    main { flex: 1; width: 100vw; padding: 1.5rem; }
+    .table-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.25rem;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      overflow-x: auto;
+    }
+    table.dataTable { width: 100% !important; border-collapse: collapse !important; color: var(--text-main); font-size: 0.875rem; }
+    table.dataTable thead th {
+      background-color: #1e293b !important;
+      color: #94a3b8 !important;
+      text-transform: uppercase;
+      font-size: 0.725rem;
+      letter-spacing: 0.05em;
+      padding: 12px 14px !important;
+      border-bottom: 2px solid var(--border-accent) !important;
+      white-space: nowrap;
+    }
+    table.dataTable tbody tr { background-color: transparent !important; border-bottom: 1px solid var(--border-subtle); }
+    table.dataTable tbody tr:hover { background-color: rgba(99, 102, 241, 0.08) !important; }
+    table.dataTable tbody td { padding: 12px 14px !important; white-space: nowrap; }
+    .badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
+    .badge-code { background: #1e293b; color: #38bdf8; border: 1px solid #334155; font-family: monospace; }
+    .badge-val { color: #fbbf24; font-weight: 600; }
+    #loader { text-align: center; padding: 3rem; color: var(--text-muted); font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand-title">
+      <h1>Video Game Vault</h1>
+    </div>
+    <div class="stats-group">
+      <div class="stat-pill">Total Games: <span id="stat-count">-</span></div>
+      <div class="stat-pill">Est. Value: <span id="stat-val">-</span></div>
+    </div>
+  </header>
+
+  <main>
+    <div class="table-card">
+      <div id="loader">Fetching data live from your GitHub Gist...</div>
+      <table id="collectionTable" class="display nowrap" style="display:none; width:100%;">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    // Paste your Raw Gist URL here or pass it in query param: ?gist=<RAW_URL>
+    const urlParams = new URLSearchParams(window.location.search);
+    const rawGistUrl = urlParams.get('gist') || "https://gist.githubusercontent.com/katzkid/9ff78df9b1c5f719350a26555b0f6640/raw/games.csv";
+
+    async function loadGistData() {
+      try {
+        const response = await fetch(rawGistUrl);
+        if (!response.ok) throw new Error("Could not fetch Gist CSV.");
+        const csvText = await response.text();
+
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: function(results) {
+            renderTable(results.data, results.meta.fields);
+          }
+        });
+      } catch (err) {
+        document.getElementById('loader').innerHTML = `
+          <div style="color: #f87171;">
+            <p><strong>Failed to load Gist</strong>: ${err.message}</p>
+            <p style="font-size:0.85rem; margin-top: 8px;">Ensure you provide the direct <code>raw.githubusercontent.com</code> URL or append <code>?gist=YOUR_RAW_URL</code> to this page's URL.</p>
+          </div>`;
+      }
+    }
+
+    function renderTable(data, columns) {
+      document.getElementById('loader').style.display = 'none';
+      const table = document.getElementById('collectionTable');
+      table.style.display = 'table';
+
+      // Header setup
+      const thead = table.querySelector('thead');
+      const headerRow = document.createElement('tr');
+      columns.forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = col.replace(/_/g, ' ');
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+
+      // DataTables column mapping
+      const dtColumns = columns.map(col => ({ data: col, defaultContent: "" }));
+
+      // Calculate totals
+      let totalValue = 0;
+      data.forEach(item => {
+        const val = parseFloat(item.Current_Estimated_Value || item.Estimated_Value_CIB || 0);
+        if (!isNaN(val)) totalValue += val;
+      });
+
+      document.getElementById('stat-count').textContent = data.length;
+      document.getElementById('stat-val').textContent = "€" + totalValue.toFixed(2);
+
+      $('#collectionTable').DataTable({
+        data: data,
+        columns: dtColumns,
+        pageLength: 25,
+        scrollX: true,
+        order: [[1, 'asc']]
+      });
+    }
+
+    if (rawGistUrl && rawGistUrl !== "PASTE_YOUR_RAW_GIST_URL_HERE") {
+      loadGistData();
+    } else {
+      document.getElementById('loader').innerHTML = `
+        <p>Please configure your Gist URL in the file script or add <code>?gist=YOUR_RAW_GIST_URL</code> to the address bar.</p>`;
+    }
+  </script>
+</body>
+</html>
