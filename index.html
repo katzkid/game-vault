@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video Game Vault (Live Gist Sync)</title>
-  <!-- DataTables & PapaParse for CSV parsing -->
+  <title>Video Game Vault</title>
+  <!-- DataTables & PapaParse -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -102,7 +102,7 @@
 
   <main>
     <div class="table-card">
-      <div id="loader">Fetching data live from your GitHub Gist...</div>
+      <div id="loader">Loading collection from games.csv...</div>
       <table id="collectionTable" class="display nowrap" style="display:none; width:100%;">
         <thead></thead>
         <tbody></tbody>
@@ -111,14 +111,15 @@
   </main>
 
   <script>
-    // Paste your Raw Gist URL here or pass it in query param: ?gist=<RAW_URL>
-    const urlParams = new URLSearchParams(window.location.search);
-    const rawGistUrl = urlParams.get('gist') || "https://gist.githubusercontent.com/katzkid/9ff78df9b1c5f719350a26555b0f6640/raw/games.csv";
+    // Relative fetch targeting games.csv in the same repository
+    const csvFilePath = "games.csv";
 
-    async function loadGistData() {
+    async function loadRepoData() {
       try {
-        const response = await fetch(rawGistUrl);
-        if (!response.ok) throw new Error("Could not fetch Gist CSV.");
+        const response = await fetch(csvFilePath);
+        if (!response.ok) {
+          throw new Error("Could not find games.csv in repository root.");
+        }
         const csvText = await response.text();
 
         Papa.parse(csvText, {
@@ -131,8 +132,8 @@
       } catch (err) {
         document.getElementById('loader').innerHTML = `
           <div style="color: #f87171;">
-            <p><strong>Failed to load Gist</strong>: ${err.message}</p>
-            <p style="font-size:0.85rem; margin-top: 8px;">Ensure you provide the direct <code>raw.githubusercontent.com</code> URL or append <code>?gist=YOUR_RAW_URL</code> to this page's URL.</p>
+            <p><strong>Failed to load collection</strong>: ${err.message}</p>
+            <p style="font-size:0.85rem; margin-top: 8px;">Ensure <code>games.csv</code> is committed in the same folder as <code>index.html</code>.</p>
           </div>`;
       }
     }
@@ -142,8 +143,9 @@
       const table = document.getElementById('collectionTable');
       table.style.display = 'table';
 
-      // Header setup
+      // Setup dynamic table headers
       const thead = table.querySelector('thead');
+      thead.innerHTML = "";
       const headerRow = document.createElement('tr');
       columns.forEach(col => {
         const th = document.createElement('th');
@@ -152,7 +154,7 @@
       });
       thead.appendChild(headerRow);
 
-      // DataTables column mapping
+      // Map DataTables column fields
       const dtColumns = columns.map(col => ({ data: col, defaultContent: "" }));
 
       // Calculate totals
@@ -163,23 +165,4 @@
       });
 
       document.getElementById('stat-count').textContent = data.length;
-      document.getElementById('stat-val').textContent = "€" + totalValue.toFixed(2);
-
-      $('#collectionTable').DataTable({
-        data: data,
-        columns: dtColumns,
-        pageLength: 25,
-        scrollX: true,
-        order: [[1, 'asc']]
-      });
-    }
-
-    if (rawGistUrl && rawGistUrl !== "PASTE_YOUR_RAW_GIST_URL_HERE") {
-      loadGistData();
-    } else {
-      document.getElementById('loader').innerHTML = `
-        <p>Please configure your Gist URL in the file script or add <code>?gist=YOUR_RAW_GIST_URL</code> to the address bar.</p>`;
-    }
-  </script>
-</body>
-</html>
+      document.
