@@ -4,36 +4,35 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Video Game Vault</title>
-  <!-- DataTables CSS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.dataTables.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
   <style>
     :root {
       --bg-base: #0b0f19;
-      --bg-surface: #111827;
-      --bg-card: rgba(17, 24, 39, 0.95);
-      --border-subtle: #1f2937;
+      --bg-card: #111827;
+      --border: #1f2937;
       --border-accent: #374151;
-      --text-main: #f9fafb;
+      --text: #f9fafb;
       --text-muted: #9ca3af;
       --primary: #6366f1;
-      --primary-hover: #4f46e5;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background-color: var(--bg-base);
-      color: var(--text-main);
+      color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
     header {
-      background: rgba(17, 24, 39, 0.85);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(17, 24, 39, 0.95);
+      border-bottom: 1px solid var(--border);
       padding: 1rem 1.5rem;
       display: flex;
       flex-wrap: wrap;
@@ -58,71 +57,15 @@
     }
     .stat-pill span { color: var(--primary); font-weight: 700; }
     main { flex: 1; width: 100vw; padding: 1.5rem; }
-    
-    /* Filter Bar Styling */
-    .filter-bar {
-      display: none;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      margin-bottom: 1.25rem;
-      align-items: center;
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      padding: 1rem 1.25rem;
-      border-radius: 12px;
-    }
-    .filter-item {
-      display: flex;
-      flex-direction: column;
-      gap: 0.3rem;
-    }
-    .filter-item label {
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-    }
-    .filter-select {
-      background: #1f2937;
-      color: #f9fafb;
-      border: 1px solid var(--border-accent);
-      border-radius: 8px;
-      padding: 0.45rem 0.85rem;
-      font-size: 0.825rem;
-      outline: none;
-      cursor: pointer;
-      transition: border-color 0.2s;
-    }
-    .filter-select:focus {
-      border-color: var(--primary);
-    }
-    .btn-reset {
-      background: transparent;
-      color: var(--text-muted);
-      border: 1px solid var(--border-accent);
-      border-radius: 8px;
-      padding: 0.45rem 0.85rem;
-      font-size: 0.8rem;
-      cursor: pointer;
-      margin-top: auto;
-      transition: all 0.2s;
-    }
-    .btn-reset:hover {
-      background: #1f2937;
-      color: #fff;
-      border-color: #6b7280;
-    }
-
     .table-card {
       background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 1.25rem;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
       overflow-x: auto;
     }
-    table.dataTable { width: 100% !important; border-collapse: collapse !important; color: var(--text-main); font-size: 0.875rem; }
+    table.dataTable { width: 100% !important; border-collapse: collapse !important; color: var(--text); font-size: 0.875rem; }
     table.dataTable thead th {
       background-color: #1e293b !important;
       color: #94a3b8 !important;
@@ -133,28 +76,29 @@
       border-bottom: 2px solid var(--border-accent) !important;
       white-space: nowrap;
     }
-    table.dataTable tbody tr { background-color: transparent !important; border-bottom: 1px solid var(--border-subtle); }
+    table.dataTable tbody tr { background-color: transparent !important; border-bottom: 1px solid var(--border); }
     table.dataTable tbody tr:hover { background-color: rgba(99, 102, 241, 0.08) !important; }
     table.dataTable tbody td { padding: 12px 14px !important; white-space: nowrap; }
     .badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
     .badge-code { background: #1e293b; color: #38bdf8; border: 1px solid #334155; font-family: monospace; }
     .badge-val { color: #fbbf24; font-weight: 600; }
-    #loader { text-align: center; padding: 3rem; color: var(--text-muted); font-size: 1rem; line-height: 1.6; }
-    .error-box {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      color: #fca5a5;
-      padding: 1.25rem;
-      border-radius: 8px;
-      max-width: 600px;
-      margin: 0 auto;
-      text-align: left;
-    }
-    .error-box code {
+    #status-msg { text-align: center; padding: 3rem; color: var(--text-muted); font-size: 1rem; }
+    .dataTables_filter input {
       background: #1f2937;
-      padding: 2px 6px;
-      border-radius: 4px;
-      color: #f87171;
+      border: 1px solid var(--border-accent);
+      color: #fff;
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      outline: none;
+      margin-left: 0.5rem;
+    }
+    .dataTables_length select {
+      background: #1f2937;
+      border: 1px solid var(--border-accent);
+      color: #fff;
+      padding: 0.3rem 0.5rem;
+      border-radius: 6px;
+      margin: 0 0.4rem;
     }
   </style>
 </head>
@@ -170,54 +114,91 @@
   </header>
 
   <main>
-    <!-- Dynamic Filters -->
-    <div class="filter-bar" id="filter-bar">
-      <div class="filter-item">
-        <label for="filter-platform">Platform</label>
-        <select id="filter-platform" class="filter-select"><option value="">All Platforms</option></select>
-      </div>
-      <div class="filter-item">
-        <label for="filter-region">Region</label>
-        <select id="filter-region" class="filter-select"><option value="">All Regions</option></select>
-      </div>
-      <div class="filter-item">
-        <label for="filter-completeness">Completeness</label>
-        <select id="filter-completeness" class="filter-select"><option value="">All Types</option></select>
-      </div>
-      <div class="filter-item">
-        <label for="filter-status">Play Status</label>
-        <select id="filter-status" class="filter-select"><option value="">All Statuses</option></select>
-      </div>
-      <button class="btn-reset" onclick="resetFilters()">Reset Filters</button>
-    </div>
-
     <div class="table-card">
-      <div id="loader">
-        <p>Loading collection from <code>games.csv</code>...</p>
-      </div>
+      <div id="status-msg">Reading games.csv...</div>
       <div id="table-wrapper" style="display:none;">
         <table id="collectionTable" class="display nowrap" style="width:100%;">
-          <thead id="table-head"></thead>
-          <tbody id="table-body"></tbody>
+          <thead id="tbl-header"></thead>
+          <tbody id="tbl-body"></tbody>
         </table>
       </div>
     </div>
   </main>
 
-  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-
   <script>
-    let dataTableInstance = null;
-    let columnIndexMap = {};
+    Papa.parse("games.csv", {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results) {
+        if (!results.data || results.data.length === 0) {
+          document.getElementById('status-msg').innerHTML = 
+            '<span style="color:#f87171;">⚠️ games.csv was found, but it has no rows.</span>';
+          return;
+        }
 
-    function showError(title, message, fix) {
-      const loader = document.getElementById('loader');
-      if (loader) {
-        loader.style.display = 'block';
-        loader.innerHTML = `
-          <div class="error-box">
-            <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:8px; color:#f87171;">⚠️ ${title}</h3>
-            <p style="margin-bottom:8px;">${message}</p>
-            <div style="font-size:0.875rem; color:#cbd5e1; border-top:1px solid rgba(239,68,
+        const data = results.data;
+        const fields = results.meta.fields.filter(f => f && f.trim() !== "");
+
+        const headerRow = document.createElement('tr');
+        fields.forEach(f => {
+          const th = document.createElement('th');
+          th.textContent = f.replace(/_/g, ' ');
+          headerRow.appendChild(th);
+        });
+        document.getElementById('tbl-header').appendChild(headerRow);
+
+        const columns = fields.map(f => ({
+          data: f,
+          defaultContent: "",
+          render: function(val, type) {
+            if (type !== 'display' || !val) return val;
+            if (f === 'ID' || f.includes('Catalog') || f.includes('Product')) {
+              return '<span class="badge badge-code">' + val + '</span>';
+            }
+            if (f.includes('Price') || f.includes('Value')) {
+              const num = parseFloat(val);
+              return !isNaN(num) ? '<span class="badge-val">€' + num.toFixed(2) + '</span>' : val;
+            }
+            return val;
+          }
+        }));
+
+        let totalVal = 0;
+        data.forEach(item => {
+          const v = parseFloat(item.Current_Estimated_Value || item.Estimated_Value_CIB || item.Purchase_Price || 0);
+          if (!isNaN(v)) totalVal += v;
+        });
+        document.getElementById('stat-count').textContent = data.length;
+        document.getElementById('stat-val').textContent = "€" + totalVal.toFixed(2);
+
+        document.getElementById('status-msg').style.display = 'none';
+        document.getElementById('table-wrapper').style.display = 'block';
+
+        $('#collectionTable').DataTable({
+          data: data,
+          columns: columns,
+          pageLength: 25,
+          scrollX: true,
+          order: [[1, 'asc']],
+          language: {
+            search: "Search Collection: ",
+            searchPlaceholder: "Title, catalog no, tag..."
+          }
+        });
+      },
+      error: function(err) {
+        document.getElementById('status-msg').innerHTML = `
+          <div style="color: #f87171; text-align: left; max-width: 650px; margin: 0 auto; line-height: 1.6;">
+            <p><strong>⚠️ Cannot load games.csv:</strong> ${err.message || 'File not found or blocked'}</p>
+            <p style="margin-top: 8px; font-size: 0.9rem; color: #cbd5e1;">
+              Please check:
+              <br>1. Can you open <code>https://&lt;your-site&gt;/games.csv</code> directly in the address bar?
+              <br>2. Is the file in the repository named strictly <code>games.csv</code> in lowercase?
+            </p>
+          </div>`;
+      }
+    });
+  </script>
+</body>
+</html>
